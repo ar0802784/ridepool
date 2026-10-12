@@ -1,6 +1,6 @@
 /**
  * RidePool - Client-side Interactive Engine for GitHub Pages & Live Demo
- * Replicates full backend matching, fare calculation, chat simulation, and trip storage.
+ * Replicates full backend matching, fare calculation, auth flow, chat simulation, and trip storage.
  */
 (function () {
   "use strict";
@@ -36,7 +36,7 @@
 
   // --- App State ---
   const state = {
-    user: { id: 1, name: "Alex Sharma", email: "alex@example.com", phone: "+91 98765 43210" },
+    user: null, // Null initially -> shows login / register page
     currentRide: null,
     matches: [],
     quotes: [],
@@ -56,20 +56,32 @@
   // Helper DOM selector
   const $ = (id) => document.getElementById(id);
 
-  // --- LocalStorage persistence for Trips & Chats ---
+  // --- LocalStorage persistence for Trips, Chats & Auth ---
   function loadPersistedData() {
     try {
+      const savedUser = localStorage.getItem("ridepool_user");
+      if (savedUser) {
+        state.user = JSON.parse(savedUser);
+      }
+
       const savedTrips = localStorage.getItem("ridepool_trips");
       if (savedTrips) state.trips = JSON.parse(savedTrips);
 
       const savedChats = localStorage.getItem("ridepool_chats");
       if (savedChats) state.conversations = JSON.parse(savedChats);
-
-      const savedUser = localStorage.getItem("ridepool_user");
-      if (savedUser) state.user = JSON.parse(savedUser);
     } catch (e) {
       console.warn("Storage access failed", e);
     }
+  }
+
+  function saveUser() {
+    try {
+      if (state.user) {
+        localStorage.setItem("ridepool_user", JSON.stringify(state.user));
+      } else {
+        localStorage.removeItem("ridepool_user");
+      }
+    } catch (e) {}
   }
 
   function saveTrips() {
@@ -170,6 +182,57 @@
     });
   }
 
+  // --- Auth View Handler ---
+  function showAuthSubview(subviewId) {
+    $("auth-container").hidden = false;
+    $("app-container").hidden = true;
+
+    document.querySelectorAll(".auth-subview").forEach((el) => (el.hidden = true));
+
+    const sideTitle = $("auth-side-title");
+    const sideDesc = $("auth-side-desc");
+
+    if (subviewId === "register") {
+      $("auth-view-register").hidden = false;
+      sideTitle.textContent = "Make every trip cost less.";
+      sideDesc.textContent = "Co-riders see your name and phone number only after you're matched, so you can coordinate the pickup.";
+    } else if (subviewId === "forgot-password") {
+      $("auth-view-forgot").hidden = false;
+      sideTitle.textContent = "Locked out? No stress.";
+      sideDesc.textContent = "Enter your registered email or phone number and we'll send you a 6-digit code to reset your password.";
+    } else if (subviewId === "verify-otp") {
+      $("auth-view-otp").hidden = false;
+      sideTitle.textContent = "Check your inbox.";
+      sideDesc.textContent = "If an account matches, we've sent a 6-digit code. It's valid for 10 minutes.";
+    } else if (subviewId === "reset-password") {
+      $("auth-view-reset").hidden = false;
+      sideTitle.textContent = "Create a new password.";
+      sideDesc.textContent = "Choose a strong password with at least 6 characters to secure your account.";
+    } else {
+      $("auth-view-login").hidden = false;
+      sideTitle.textContent = "Going the same way? Split the fare.";
+      sideDesc.textContent = "Tell us where you're headed. We'll find people travelling to the same place at the same time, and show you the cheapest way to get there.";
+    }
+    window.scrollTo(0, 0);
+  }
+
+  function setAuthenticatedUser(user) {
+    state.user = user;
+    saveUser();
+    $("auth-container").hidden = true;
+    $("app-container").hidden = false;
+    $("user-name-display").textContent = user.name;
+    showToast(`Welcome back, ${user.name}!`);
+    navigateTo("request");
+  }
+
+  function logoutUser() {
+    state.user = null;
+    saveUser();
+    showToast("You have been logged out.");
+    navigateTo("login");
+  }
+
   // --- Router & View Management ---
   function showView(viewId) {
     document.querySelectorAll(".view-panel").forEach((el) => (el.hidden = true));
@@ -200,8 +263,31 @@
   }
 
   function handleHashChange() {
-    const hash = window.location.hash.replace("#", "") || "request";
-    const [view, param] = hash.split("/");
+    const rawHash = window.location.hash.replace("#", "") || (state.user ? "request" : "login");
+    const [view, param] = rawHash.split("/");
+
+    // Handle Auth Pages
+    if (view === "login" || view === "register" || view === "forgot-password" || view === "verify-otp" || view === "reset-password") {
+      if (state.user && (view === "login" || view === "register")) {
+        // If already logged in, redirect to request
+        return navigateTo("request");
+      }
+      return showAuthSubview(view);
+    }
+
+    if (view === "logout") {
+      return logoutUser();
+    }
+
+    // Require Login for all App views
+    if (!state.user) {
+      return navigateTo("login");
+    }
+
+    // Ensure Auth container is hidden and App container is visible
+    $("auth-container").hidden = true;
+    $("app-container").hidden = false;
+    $("user-name-display").textContent = state.user.name;
 
     if (view === "searching") {
       if (!state.currentRide) return navigateTo("request");
@@ -447,7 +533,6 @@
       reqRouteLine = L.polyline(pts, { color: "#0d6b57", weight: 3, dashArray: "6 8" }).addTo(state.requestMap);
       if (fit) state.requestMap.fitBounds(L.latLngBounds(pts), { padding: [50, 50] });
 
-      // Try OSRM driving route
       fetch(`https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`)
         .then((r) => r.json())
         .then((d) => {
@@ -510,9 +595,8 @@
 
     const demoBtn = $("demo-btn");
     demoBtn.disabled = false;
-    demoBtn.textContent = "Add demo riders nearby";
+    demoBtn.textContent = "⚡ Add demo riders nearby";
 
-    // Setup map
     if (state.searchMap) {
       state.searchMap.remove();
     }
@@ -545,7 +629,6 @@
 
     searchRiderLayer = L.layerGroup().addTo(state.searchMap);
 
-    // If matches already exist, render them
     if (state.matches.length) {
       renderSearchRidersOnMap();
     }
@@ -756,7 +839,6 @@
     $("book-share-price").textContent = b.perPerson;
     $("book-share-label").textContent = b.groupSize > 1 ? "your share" : "for the ride";
 
-    $("book-provider-name-1").textContent = b.provider;
     $("book-open-btn").textContent = `Open ${b.provider}`;
     $("book-open-btn").href = b.url;
 
@@ -971,7 +1053,96 @@
   function initGlobalEvents() {
     window.addEventListener("hashchange", handleHashChange);
 
-    // Searching Actions
+    // 1. Auth Event Listeners
+    $("login-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const email = $("login-email").value.trim();
+      const password = $("login-password").value.trim();
+      if (!email || !password) {
+        $("login-error").textContent = "Please provide both email and password.";
+        $("login-error").hidden = false;
+        return;
+      }
+      $("login-error").hidden = true;
+      const userName = email.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      setAuthenticatedUser({
+        id: Date.now(),
+        name: userName || "User",
+        email: email,
+        phone: "+91 98765 43210"
+      });
+    });
+
+    $("quick-demo-login-btn").addEventListener("click", () => {
+      setAuthenticatedUser({
+        id: 1,
+        name: "Alex Sharma",
+        email: "alex@example.com",
+        phone: "+91 98765 43210"
+      });
+    });
+
+    $("register-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const name = $("reg-name").value.trim();
+      const email = $("reg-email").value.trim();
+      const phone = $("reg-phone").value.trim();
+      const password = $("reg-password").value.trim();
+
+      if (!name || !email || !phone || password.length < 6) {
+        $("register-error").textContent = "Please fill all fields properly (password min 6 chars).";
+        $("register-error").hidden = false;
+        return;
+      }
+      $("register-error").hidden = true;
+      setAuthenticatedUser({
+        id: Date.now(),
+        name: name,
+        email: email,
+        phone: phone
+      });
+    });
+
+    $("forgot-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const ident = $("forgot-identifier").value.trim();
+      if (!ident) return;
+      showToast("Verification code generated!");
+      navigateTo("verify-otp");
+    });
+
+    $("otp-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const code = $("otp-code").value.trim();
+      if (code.length !== 6) {
+        $("otp-error").textContent = "Please enter a valid 6-digit code.";
+        $("otp-error").hidden = false;
+        return;
+      }
+      $("otp-error").hidden = true;
+      showToast("Code verified successfully!");
+      navigateTo("reset-password");
+    });
+
+    $("reset-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const p1 = $("new-password").value;
+      const p2 = $("confirm-password").value;
+      if (p1 !== p2) {
+        $("reset-error").textContent = "Passwords do not match.";
+        $("reset-error").hidden = false;
+        return;
+      }
+      $("reset-error").hidden = true;
+      setAuthenticatedUser({
+        id: 2,
+        name: "Alex Sharma",
+        email: "alex@example.com",
+        phone: "+91 98765 43210"
+      });
+    });
+
+    // 2. Searching Actions
     $("demo-btn").addEventListener("click", () => {
       $("demo-btn").disabled = true;
       $("demo-btn").textContent = "Adding nearby riders...";
@@ -988,7 +1159,7 @@
       showToast("Ride cancelled");
     });
 
-    // Results Actions
+    // 3. Results Actions
     $("book-form").addEventListener("submit", (e) => {
       e.preventDefault();
       const q = state.selectedQuote;
@@ -1009,7 +1180,6 @@
 
       state.currentBooking = booking;
 
-      // Persist in trips
       const tripRecord = {
         ...state.currentRide,
         booking: booking
@@ -1021,7 +1191,7 @@
       navigateTo("booking");
     });
 
-    // Chat submit
+    // 4. Chat submit
     $("chat-form").addEventListener("submit", (e) => {
       e.preventDefault();
       const input = $("chat-body");
@@ -1032,7 +1202,6 @@
       }
     });
 
-    // Enter to send in chat textarea
     $("chat-body").addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
@@ -1040,7 +1209,7 @@
       }
     });
 
-    // Clipboard copy buttons
+    // 5. Clipboard copy buttons
     document.querySelectorAll("[data-copy]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const text = $(btn.dataset.copy).textContent.trim();
@@ -1054,30 +1223,11 @@
         }
       });
     });
-
-    // User profile click modal
-    $("user-chip").addEventListener("click", () => {
-      $("user-modal").hidden = false;
-    });
-    $("close-modal-btn").addEventListener("click", () => {
-      $("user-modal").hidden = true;
-    });
-    $("switch-user-form").addEventListener("submit", (e) => {
-      e.preventDefault();
-      const name = $("modal-user-name").value.trim() || "Alex Sharma";
-      state.user.name = name;
-      $("user-name-display").textContent = name;
-      localStorage.setItem("ridepool_user", JSON.stringify(state.user));
-      $("user-modal").hidden = true;
-      showToast(`Logged in as ${name}`);
-    });
   }
 
   // --- Bootloader ---
   document.addEventListener("DOMContentLoaded", () => {
     loadPersistedData();
-    $("user-name-display").textContent = state.user.name;
-    $("modal-user-name").value = state.user.name;
     initRequestPage();
     initGlobalEvents();
     handleHashChange();
