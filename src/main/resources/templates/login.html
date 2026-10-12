@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Log in')}"></head>
+<body>
+<div class="auth-wrap">
+    <section class="auth-side">
+        <a class="brand" th:href="@{/login}">Ride<span>Pool</span></a>
+        <h1>Going the same way? Split the fare.</h1>
+        <p>Tell us where you're headed. We'll find people travelling to the same place at the same time, and show you the cheapest way to get there.</p>
+    </section>
+    <section class="auth-form">
+        <h2>Log in</h2>
+        <div class="alert error" th:if="${error}" th:text="${error}" role="alert">Error</div>
+        <form method="post" th:action="@{/login}">
+            <div class="field">
+                <label for="email">Email</label>
+                <input id="email" name="email" type="email" required autocomplete="email" th:value="${email}">
+            </div>
+            <div class="field">
+                <label for="password">Password</label>
+                <input id="password" name="password" type="password" required autocomplete="current-password">
+            </div>
+            <div class="field-hint" style="text-align:right;margin-bottom:.75rem"><a th:href="@{/forgot-password}">Forgot password?</a></div>
+            <button class="btn block" type="submit">Log in</button>
+        </form>
+        <p class="muted" style="margin-top:1rem">New here? <a th:href="@{/register}">Create an account</a></p>
+    </section>
+</div>
+</body>
+</html>

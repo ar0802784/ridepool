@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Create account')}"></head>
+<body>
+<div class="auth-wrap">
+    <section class="auth-side">
+        <a class="brand" th:href="@{/login}">Ride<span>Pool</span></a>
+        <h1>Make every trip cost less.</h1>
+        <p>Co-riders see your name and phone number only after you're matched, so you can coordinate the pickup.</p>
+    </section>
+    <section class="auth-form">
+        <h2>Create your account</h2>
+        <div class="alert error" th:if="${error}" th:text="${error}" role="alert">Error</div>
+        <form method="post" th:action="@{/register}">
+            <div class="field">
+                <label for="name">Full name</label>
+                <input id="name" name="name" type="text" required autocomplete="name" th:value="${name}">
+            </div>
+            <div class="field">
+                <label for="email">Email</label>
+                <input id="email" name="email" type="email" required autocomplete="email" th:value="${email}">
+            </div>
+            <div class="field">
+                <label for="phone">Phone number</label>
+                <input id="phone" name="phone" type="tel" required autocomplete="tel" th:value="${phone}">
+            </div>
+            <div class="field">
+                <label for="password">Password</label>
+                <input id="password" name="password" type="password" required minlength="6" autocomplete="new-password">
+                <div class="field-hint">At least 6 characters.</div>
+            </div>
+            <button class="btn block" type="submit">Create account</button>
+        </form>
+        <p class="muted" style="margin-top:1rem">Already registered? <a th:href="@{/login}">Log in</a></p>
+    </section>
+</div>
+</body>
+</html>

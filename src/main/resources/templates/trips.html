@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('My trips')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar}"></header>
+
+<main class="page narrow">
+    <div class="page-head">
+        <div>
+            <h1>My trips</h1>
+            <p class="muted">Your previous ride requests and bookings, newest first.</p>
+        </div>
+        <a class="btn small" th:href="@{/request}">New ride</a>
+    </div>
+
+    <div class="empty" th:if="${#lists.isEmpty(trips)}">
+        <h3>No trips yet</h3>
+        <p style="margin-inline:auto">Plan your first ride and it will show up here.</p>
+        <a class="btn ghost small" th:href="@{/request}">Plan a ride</a>
+    </div>
+
+    <article class="trip" th:each="t : ${trips}">
+        <div class="trip-head">
+            <div class="trip-route">
+                <strong th:text="${t.ride.fromName}">From</strong>
+                <span class="muted"> to </span>
+                <strong th:text="${t.ride.toName}">To</strong>
+            </div>
+            <span class="tag" th:if="${t.booking != null}" th:text="'Booked: ' + ${t.booking.provider}">Booked</span>
+            <span class="tag muted-tag" th:if="${t.booking == null}">Not booked</span>
+        </div>
+        <p class="muted small" style="margin:.35rem 0"
+           th:text="'Leaving ' + ${#temporals.format(t.ride.departureTime, 'dd MMM yyyy, hh:mm a')}">Time</p>
+        <p class="small" style="margin:.25rem 0" th:if="${t.booking != null}"
+           th:text="${t.booking.vehicle} + ', total about Rs ' + ${t.booking.totalFare} + (${t.booking.groupSize > 1} ? ', your share about Rs ' + ${t.booking.perPerson} + ' (' + ${t.booking.groupSize} + ' riders)' : ', riding alone')">Booking</p>
+        <p style="margin:.6rem 0 0">
+            <a class="btn small" th:if="${t.booking != null}" th:href="@{/booking/{id}(id=${t.booking.id})}">Booking details</a>
+            <a class="btn ghost small" th:href="@{/results/{id}(id=${t.ride.id})}">View fares</a>
+        </p>
+    </article>
+</main>
+</body>
+</html>

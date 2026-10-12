@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Messages')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar}"></header>
+
+<main class="page narrow">
+    <h1>Messages</h1>
+    <p class="muted">Chat with riders who are going your way.</p>
+
+    <div class="empty" th:if="${#lists.isEmpty(conversations)}">
+        <h3>No conversations yet</h3>
+        <p style="margin-inline:auto">When you're matched with riders, tap Message on their card to start a chat.</p>
+        <a class="btn ghost small" th:href="@{/request}">Plan a ride</a>
+    </div>
+
+    <a class="convo" th:each="c : ${conversations}" th:href="@{/chat/{id}(id=${c.other.id})}">
+        <div class="convo-main">
+            <strong th:text="${c.other.name}">Name</strong>
+            <span class="convo-preview muted"
+                  th:text="(${c.last.sender.id == meId} ? 'You: ' : '') + ${#strings.abbreviate(c.last.body, 70)}">Last message</span>
+        </div>
+        <div class="convo-meta">
+            <span class="muted small" th:text="${#temporals.format(c.last.sentAt, 'dd MMM, hh:mm a')}">Time</span>
+            <span class="badge" th:if="${c.unread > 0}" th:text="${c.unread}">1</span>
+        </div>
+    </a>
+</main>
+</body>
+</html>

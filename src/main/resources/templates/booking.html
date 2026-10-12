@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Booking summary')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar}"></header>
+
+<main class="page">
+    <h1>Booking summary</h1>
+    <p class="muted" th:text="'Saved ' + ${#temporals.format(booking.createdAt, 'dd MMM, hh:mm a')}">Saved</p>
+
+    <section class="best" aria-label="Your choice">
+        <div>
+            <h2>You chose</h2>
+            <div class="provider">
+                <span th:text="${booking.provider}">Ola</span>
+                <span th:text="${booking.vehicle}" style="font-weight:500">Mini cab</span>
+            </div>
+            <p th:if="${booking.groupSize > 1}"
+               th:text="'Shared by ' + ${booking.groupSize} + ' riders. Total fare about Rs ' + ${booking.totalFare} + '.'">Shared</p>
+            <p th:if="${booking.groupSize == 1}"
+               th:text="'Riding alone. Total fare about Rs ' + ${booking.totalFare} + '.'">Solo</p>
+        </div>
+        <div class="price">
+            &#8377;<span th:text="${booking.perPerson}">150</span>
+            <small th:text="${booking.groupSize > 1} ? 'your share' : 'for the ride'">for the ride</small>
+        </div>
+    </section>
+
+    <div class="two-col">
+        <section class="card">
+            <h2>Finish booking in the app</h2>
+            <p class="muted small">
+                <span th:text="${booking.provider}">Ola</span> doesn't let other apps place bookings for you, so the last step happens there.
+            </p>
+            <ol class="steps">
+                <li th:if="${!#lists.isEmpty(matches)}">Message your co-riders so everyone knows which service you picked.</li>
+                <li th:if="${prefilled}">
+                    Press <strong>Open <span th:text="${booking.provider}">Ola</span></strong>. Your pickup and drop are already filled in,
+                    so just check them and confirm the ride.
+                    <div class="trip-box">
+                        <div><span class="muted">Pickup:</span> <span th:text="${ride.fromName}">From</span></div>
+                        <div><span class="muted">Drop:</span> <span th:text="${ride.toName}">To</span></div>
+                        <div><span class="muted">Leaving:</span> <span th:text="${#temporals.format(ride.departureTime, 'dd MMM, hh:mm a')}">Time</span></div>
+                    </div>
+                </li>
+                <li th:unless="${prefilled}">
+                    <span th:text="${booking.provider}">Rapido</span> has no link that can carry your trip, so copy the pickup and drop
+                    below and paste them in the app:
+                    <div class="trip-box">
+                        <div><span class="muted">Pickup:</span> <span id="pickup-text" th:text="${ride.fromName}">From</span>
+                            <button type="button" class="btn ghost small" data-copy="pickup-text">Copy</button></div>
+                        <div><span class="muted">Drop:</span> <span id="drop-text" th:text="${ride.toName}">To</span>
+                            <button type="button" class="btn ghost small" data-copy="drop-text">Copy</button></div>
+                        <div><span class="muted">Leaving:</span> <span th:text="${#temporals.format(ride.departureTime, 'dd MMM, hh:mm a')}">Time</span></div>
+                    </div>
+                </li>
+                <li>Book it at the fare the app shows, and split the cost with your co-riders.</li>
+            </ol>
+            <a class="btn block" th:href="${appLink}" target="_blank" rel="noopener noreferrer"
+               th:text="'Open ' + ${booking.provider}">Open Ola</a>
+        </section>
+
+        <section>
+            <h2 th:if="${!#lists.isEmpty(matches)}">Your co-riders</h2>
+            <article class="rider" th:each="m : ${matches}">
+                <div class="rider-head">
+                    <h3 style="margin:0" th:text="${m.user.name}">Name</h3>
+                    <span class="rating" th:if="${m.avgRating != null}">
+                        <span class="star" aria-hidden="true">&#9733;</span>
+                        <span th:text="${#numbers.formatDecimal(m.avgRating, 1, 1)}">4.5</span>
+                    </span>
+                </div>
+                <p class="muted small" style="margin:.25rem 0 .5rem" th:text="${m.user.phone}">Phone</p>
+                <a class="btn small" th:href="@{/chat/{uid}(uid=${m.user.id},draft=${draft})}">Message about this booking</a>
+            </article>
+            <p class="muted" th:if="${#lists.isEmpty(matches)}">
+                No co-riders on this booking. You can still
+                <a th:href="@{/searching/{id}(id=${ride.id})}">keep searching</a> before you book.
+            </p>
+            <p style="margin-top:1rem">
+                <a class="btn ghost" th:href="@{/results/{id}(id=${ride.id})}">Back to fares</a>
+                <a class="btn ghost" th:href="@{/request}">Plan another ride</a>
+            </p>
+        </section>
+    </div>
+</main>
+<script>
+document.querySelectorAll('[data-copy]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var text = document.getElementById(btn.dataset.copy).textContent.trim();
+    var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); };
+    if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done); }
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Chat')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar}"></header>
+
+<main class="page narrow">
+    <p class="small"><a th:href="@{/messages}">Back to messages</a></p>
+    <h1 th:text="${other.name}">Name</h1>
+    <p class="muted small">
+        Phone: <a th:href="'tel:' + ${other.phone}" th:text="${other.phone}">+91 00000 00000</a>
+    </p>
+
+    <div class="chat-log" id="chat-log" aria-live="polite"
+         th:attr="data-user=${other.id},data-last=${lastId}">
+        <p class="muted" id="chat-empty" th:if="${#lists.isEmpty(messages)}">
+            No messages yet. Say hello and agree on a pickup spot.
+        </p>
+        <div class="bubble" th:each="m : ${messages}"
+             th:classappend="${m.sender.id == meId} ? 'mine' : 'theirs'">
+            <span class="body" th:text="${m.body}">Hello</span>
+            <span class="time" th:text="${#temporals.format(m.sentAt, 'hh:mm a')}">10:00 AM</span>
+        </div>
+    </div>
+
+    <form id="chat-form" class="chat-form" method="post" th:action="@{/chat/{id}(id=${other.id})}">
+        <label for="body" class="sr-only">Your message</label>
+        <textarea id="body" name="body" rows="2" maxlength="1000" required
+                  placeholder="Write a message" th:text="${draft}"></textarea>
+        <button class="btn" type="submit">Send</button>
+    </form>
+</main>
+
+<script th:src="@{/js/chat.js}"></script>
+</body>
+</html>

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RidePool - Smarter Ride-Sharing & Fare Comparison</title>
+    <meta name="description" content="Find people travelling the same way, split the fare, and see the cheapest option across Ola, Uber, Rapido and inDrive.">
+    
+    <!-- Open Graph for GitHub link previews -->
+    <meta property="og:title" content="RidePool - Share Rides & Compare Fares">
+    <meta property="og:description" content="Interactive ride-sharing application with real-time map matching, fare splitting across Ola, Uber, Rapido & inDrive, and in-app chat.">
+    <meta property="og:type" content="website">
+
+    <!-- Fonts & Leaflet Map Styles -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Demo Banner -->
+    <div class="demo-banner">
+        <span>✨ <strong>RidePool Live Demo</strong>: Compare fares across Ola, Uber, Rapido &amp; inDrive with real-time pooling.</span>
+        <a href="#request">Plan a Ride</a>
+    </div>
+
+    <!-- Top Navigation Bar -->
+    <header class="topbar">
+        <a class="brand" href="#request">
+            Ride<span>Pool</span>
+            <span class="live-badge">Live</span>
+        </a>
+        <nav>
+            <div class="user-chip" id="user-chip" title="Click to change profile">
+                <span class="dot"></span>
+                <span id="user-name-display">Alex Sharma</span>
+            </div>
+            <a class="nav-link active" id="nav-request" href="#request">New ride</a>
+            <a class="nav-link" id="nav-trips" href="#trips">My trips</a>
+            <a class="nav-link" id="nav-messages" href="#messages">
+                Messages<span class="badge" id="unread-badge" hidden>1</span>
+            </a>
+        </nav>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="page">
+
+        <!-- ==========================================
+             VIEW 1: REQUEST PAGE (#request)
+        =========================================== -->
+        <section id="view-request" class="view-panel">
+            <div class="page-head">
+                <div>
+                    <h1>Where are you going?</h1>
+                    <p class="muted">Choose your pickup and drop. Pick a popular route, search any place, or tap directly on the map.</p>
+                </div>
+                <a class="btn ghost small" href="#trips">My trips</a>
+            </div>
+
+            <div class="split">
+                <form class="card" id="ride-form" novalidate>
+                    <div class="alert error" id="form-error-js" role="alert" hidden></div>
+
+                    <!-- Pickup Location -->
+                    <div class="field">
+                        <label for="from">Pickup (from)</label>
+                        <input id="from" type="text" autocomplete="off" required placeholder="e.g. Knowledge Park II, Greater Noida">
+                        <input type="hidden" id="fromLat">
+                        <input type="hidden" id="fromLng">
+                        <ul class="suggestions" id="from-list" hidden></ul>
+
+                        <div class="preset-pills">
+                            <span class="preset-pill" data-target="from" data-index="0">Knowledge Park II</span>
+                            <span class="preset-pill" data-target="from" data-index="2">Connaught Place</span>
+                            <span class="preset-pill" data-target="from" data-index="3">Cyber Hub</span>
+                        </div>
+                        <button type="button" class="link-btn small" id="use-location" style="margin-top:.4rem">📍 Use my current location</button>
+                    </div>
+
+                    <!-- Drop Location -->
+                    <div class="field">
+                        <label for="to">Drop (to)</label>
+                        <input id="to" type="text" autocomplete="off" required placeholder="e.g. India Gate, New Delhi">
+                        <input type="hidden" id="toLat">
+                        <input type="hidden" id="toLng">
+                        <ul class="suggestions" id="to-list" hidden></ul>
+
+                        <div class="preset-pills">
+                            <span class="preset-pill" data-target="to" data-index="1">India Gate</span>
+                            <span class="preset-pill" data-target="to" data-index="4">IGI Airport T3</span>
+                            <span class="preset-pill" data-target="to" data-index="5">Noida Sec 62</span>
+                        </div>
+                    </div>
+
+                    <!-- Departure Time -->
+                    <div class="field">
+                        <label for="departure">Leaving at</label>
+                        <input id="departure" type="datetime-local" required>
+                        <div class="field-hint">We match you with riders leaving within 20 minutes of your time.</div>
+                    </div>
+
+                    <button class="btn block" type="submit">Find riders &amp; Compare Fares</button>
+                </form>
+
+                <div>
+                    <div id="map" class="map tall" aria-label="Interactive Map"></div>
+                    <p class="field-hint" id="map-hint">Tap the map to set pickup. After that, tap to set drop.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             VIEW 2: SEARCHING SCREEN (#searching)
+        =========================================== -->
+        <section id="view-searching" class="view-panel" hidden>
+            <div class="split">
+                <div class="card">
+                    <div class="status-row" aria-live="polite">
+                        <div class="spinner" id="spinner" aria-hidden="true"></div>
+                        <h1 id="status-title" style="margin:0;font-size:1.5rem">Looking for riders</h1>
+                    </div>
+                    <p class="muted" id="status-text">Checking for people going your way. This page updates in real-time.</p>
+
+                    <p style="margin-bottom:.25rem"><strong id="search-from">Pickup</strong></p>
+                    <p class="muted small" style="margin-bottom:.5rem">to</p>
+                    <p><strong id="search-to">Drop</strong></p>
+                    <p class="muted small" id="search-time">Leaving soon</p>
+
+                    <div class="stats">
+                        <div class="stat"><b id="search-km">0 km</b><span>Estimated distance</span></div>
+                        <div class="stat"><b id="search-min">0 min</b><span>Estimated time</span></div>
+                        <div class="stat"><b id="search-cost">₹0 - ₹0</b><span>Solo ride estimate</span></div>
+                    </div>
+                    <p class="small alert warning" id="search-peak-hint" hidden>Peak travel hour: fares include typical rush-hour surge.</p>
+
+                    <div class="actions">
+                        <button class="btn amber" type="button" id="demo-btn">⚡ Add demo riders nearby</button>
+                        <button class="btn ghost" type="button" id="skip-search-btn">Skip waiting and see best deals</button>
+                        <button class="link-btn" type="button" id="cancel-ride-btn" style="text-align:center;margin-top:.3rem">Cancel this ride</button>
+                    </div>
+                </div>
+
+                <div>
+                    <div id="search-map" class="map tall" aria-label="Searching Map"></div>
+                    <p class="field-hint">Yellow dots indicate verified riders heading in your direction.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             VIEW 3: RESULTS & FARES (#results)
+        =========================================== -->
+        <section id="view-results" class="view-panel" hidden>
+            <p class="route-line">
+                <span id="res-from">Pickup</span>
+                <span class="muted" style="font-weight:400"> to </span>
+                <span id="res-to">Drop</span>
+            </p>
+            <p class="muted small" id="res-summary">Trip summary</p>
+
+            <!-- Best Deal Banner -->
+            <section class="best" aria-label="Best deal">
+                <div>
+                    <h2 id="best-headline">Best deal when you share</h2>
+                    <div class="provider" id="best-provider">Ola Mini cab</div>
+                    <p id="best-sub">You save money compared to riding alone.</p>
+                </div>
+                <div class="price">
+                    ₹<span id="best-price">120</span>
+                    <small id="best-share-label">your share</small>
+                </div>
+            </section>
+
+            <div class="two-col">
+                <!-- Co-riders List -->
+                <div>
+                    <h2>Riders going your way</h2>
+                    <div class="empty" id="riders-empty" hidden>
+                        <h3>Nobody matches yet</h3>
+                        <p>We match riders whose pickup and drop are within 2 km and leaving within 20 minutes.</p>
+                        <a class="btn ghost small" href="#searching">Keep searching</a>
+                    </div>
+                    <div id="riders-list"></div>
+                    <p class="small muted" style="margin-top:.75rem">
+                        Meet in a safe public spot. Confirm cab license plate and co-rider details before boarding.
+                    </p>
+                </div>
+
+                <!-- Fare Comparison Table -->
+                <div>
+                    <h2>Choose a service &amp; split fare</h2>
+                    <form class="card" id="book-form" style="padding:.75rem 1.25rem 1.25rem">
+                        <table class="fares">
+                            <thead>
+                                <tr>
+                                    <th>Service</th>
+                                    <th class="num">Total fare</th>
+                                    <th class="num">Your share</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fares-tbody"></tbody>
+                        </table>
+                        
+                        <div style="margin-top:1.25rem">
+                            <p class="small" id="selection-text" style="font-weight:600;margin-bottom:.75rem">Selected service</p>
+                            <button class="btn block" type="submit">Book now &amp; Share Ride</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             VIEW 4: BOOKING SUMMARY (#booking)
+        =========================================== -->
+        <section id="view-booking" class="view-panel" hidden>
+            <h1>Booking summary</h1>
+            <p class="muted" id="book-saved-time">Saved</p>
+
+            <section class="best" aria-label="Your choice">
+                <div>
+                    <h2>You chose</h2>
+                    <div class="provider" id="book-provider">Ola Mini cab</div>
+                    <p id="book-split-info">Shared by riders</p>
+                </div>
+                <div class="price">
+                    ₹<span id="book-share-price">120</span>
+                    <small id="book-share-label">your share</small>
+                </div>
+            </section>
+
+            <div class="two-col">
+                <section class="card">
+                    <h2>Finish booking in the app</h2>
+                    <p class="muted small">
+                        Ride-hailing platforms require final dispatch inside their respective app or website:
+                    </p>
+                    <ol class="steps">
+                        <li>Message your co-riders so everyone knows which cab you booked.</li>
+                        <li>
+                            Copy your trip details to paste into the booking screen:
+                            <div class="trip-box">
+                                <div><span class="muted">Pickup:</span> <span id="book-pickup-text">Pickup</span>
+                                    <button type="button" class="btn ghost small" data-copy="book-pickup-text">Copy</button>
+                                </div>
+                                <div><span class="muted">Drop:</span> <span id="book-drop-text">Drop</span>
+                                    <button type="button" class="btn ghost small" data-copy="book-drop-text">Copy</button>
+                                </div>
+                                <div><span class="muted">Leaving:</span> <span id="book-leaving-text">Time</span></div>
+                            </div>
+                        </li>
+                        <li>Launch the app to place the booking:</li>
+                    </ol>
+                    <a class="btn block" id="book-open-btn" target="_blank" rel="noopener noreferrer" href="https://www.olacabs.com">
+                        Open Ola
+                    </a>
+                </section>
+
+                <section>
+                    <h2>Your co-riders</h2>
+                    <div id="book-coriders"></div>
+                    <div style="margin-top:1.5rem;display:flex;gap:.5rem;flex-wrap:wrap">
+                        <a class="btn ghost small" href="#results">Back to fares</a>
+                        <a class="btn ghost small" href="#request">Plan another ride</a>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             VIEW 5: IN-APP CHAT (#chat)
+        =========================================== -->
+        <section id="view-chat" class="view-panel narrow" hidden>
+            <p class="small"><a href="#messages">&larr; Back to messages</a></p>
+            <h1 id="chat-rider-name">Co-Rider</h1>
+            <p class="muted small">
+                Phone: <a id="chat-rider-phone" href="tel:+910000000000">+91 00000 00000</a> • Verified Rider
+            </p>
+
+            <div class="chat-log" id="chat-log" aria-live="polite"></div>
+
+            <form id="chat-form" class="chat-form">
+                <textarea id="chat-body" rows="2" maxlength="1000" required placeholder="Write a message to your co-rider..."></textarea>
+                <button class="btn" type="submit">Send</button>
+            </form>
+        </section>
+
+        <!-- ==========================================
+             VIEW 6: MESSAGES INBOX (#messages)
+        =========================================== -->
+        <section id="view-messages" class="view-panel narrow" hidden>
+            <div class="page-head">
+                <div>
+                    <h1>Messages</h1>
+                    <p class="muted">Chat with matched riders to coordinate pickup spots and ride details.</p>
+                </div>
+            </div>
+            <div class="empty" id="inbox-empty" hidden>
+                <h3>No messages yet</h3>
+                <p>When you match with riders, you can message them here.</p>
+                <a class="btn ghost small" href="#request">Find riders</a>
+            </div>
+            <div id="inbox-list"></div>
+        </section>
+
+        <!-- ==========================================
+             VIEW 7: MY TRIPS (#trips)
+        =========================================== -->
+        <section id="view-trips" class="view-panel narrow" hidden>
+            <div class="page-head">
+                <div>
+                    <h1>My trips</h1>
+                    <p class="muted">Your saved ride requests and bookings history.</p>
+                </div>
+                <a class="btn small" href="#request">New ride</a>
+            </div>
+            <div class="empty" id="trips-empty" hidden>
+                <h3>No trips yet</h3>
+                <p>Plan your first ride and it will be saved here automatically.</p>
+                <a class="btn ghost small" href="#request">Plan a ride</a>
+            </div>
+            <div id="trips-list"></div>
+        </section>
+
+    </main>
+
+    <!-- User Profile Switcher Modal -->
+    <div class="modal-overlay" id="user-modal" hidden>
+        <div class="modal-card">
+            <h2>Demo User Profile</h2>
+            <p class="muted small">Change your demo name to simulate multi-user accounts.</p>
+            <form id="switch-user-form">
+                <div class="field">
+                    <label for="modal-user-name">Your Name</label>
+                    <input type="text" id="modal-user-name" required value="Alex Sharma">
+                </div>
+                <div style="display:flex;gap:.5rem;justify-content:flex-end">
+                    <button type="button" class="btn ghost small" id="close-modal-btn">Cancel</button>
+                    <button type="submit" class="btn small">Save Profile</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

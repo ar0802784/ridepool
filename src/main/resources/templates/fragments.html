@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title} + ' - RidePool'">RidePool</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<header class="topbar" th:fragment="topbar">
+    <a class="brand" th:href="@{/request}">Ride<span>Pool</span></a>
+    <nav>
+        <span th:if="${userName != null}" th:text="${userName}">Name</span>
+        <a th:href="@{/request}">New ride</a>
+        <a th:href="@{/trips}">My trips</a>
+        <a th:href="@{/messages}">Messages<span class="badge" th:if="${unreadCount > 0}" th:text="${unreadCount}">1</span></a>
+        <a th:href="@{/logout}">Log out</a>
+    </nav>
+</header>
+</body>
+</html>

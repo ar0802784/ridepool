@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Where to?')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar}"></header>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<main class="page">
+    <div class="page-head">
+        <div>
+            <h1>Where are you going?</h1>
+            <p class="muted">Choose your pickup and drop. Type a place and pick it from the list, or tap the map.</p>
+        </div>
+        <a class="btn ghost small" th:href="@{/trips}">My trips</a>
+    </div>
+
+    <div class="split">
+        <form class="card" id="ride-form" method="post" th:action="@{/request}" novalidate>
+            <div class="alert error" id="form-error" role="alert" th:if="${error}" th:text="${error}">Error</div>
+            <div class="alert error" id="form-error-js" role="alert" hidden></div>
+
+            <div class="field">
+                <label for="from">Pickup (from)</label>
+                <input id="from" name="fromName" type="text" autocomplete="off" required
+                       placeholder="e.g. Knowledge Park II, Greater Noida" th:value="${fromName}">
+                <input type="hidden" name="fromLat" id="fromLat">
+                <input type="hidden" name="fromLng" id="fromLng">
+                <ul class="suggestions" id="from-list" hidden></ul>
+                <button type="button" class="link-btn small" id="use-location">Use my current location</button>
+            </div>
+
+            <div class="field">
+                <label for="to">Drop (to)</label>
+                <input id="to" name="toName" type="text" autocomplete="off" required
+                       placeholder="e.g. India Gate, New Delhi" th:value="${toName}">
+                <input type="hidden" name="toLat" id="toLat">
+                <input type="hidden" name="toLng" id="toLng">
+                <ul class="suggestions" id="to-list" hidden></ul>
+            </div>
+
+            <div class="field">
+                <label for="departure">Leaving at</label>
+                <input id="departure" name="departure" type="datetime-local" required th:value="${defaultTime}">
+                <div class="field-hint">We match you with people leaving within 20 minutes of this time.</div>
+            </div>
+
+            <button class="btn block" type="submit">Find riders</button>
+        </form>
+
+        <div>
+            <div id="map" class="map tall" aria-label="Map for choosing pickup and drop"></div>
+            <p class="field-hint" id="map-hint">Tap the map to set the pickup. After that, tap to set the drop.</p>
+        </div>
+    </div>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script th:src="@{/js/request.js}"></script>
+</body>
+</html>

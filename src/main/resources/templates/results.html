@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Your ride options')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar}"></header>
+
+<main class="page">
+    <p class="route-line">
+        <span th:text="${ride.fromName}">From</span>
+        <span class="muted" style="font-weight:400"> to </span>
+        <span th:text="${ride.toName}">To</span>
+    </p>
+    <p class="muted small"
+       th:text="${#temporals.format(ride.departureTime, 'dd MMM, hh:mm a')} + ', about ' + ${#numbers.formatDecimal(km, 1, 1)} + ' km, around ' + ${minutes} + ' min'">
+        Details
+    </p>
+
+    <!-- Best deal -->
+    <section class="best" aria-label="Best deal">
+        <div>
+            <h2 th:if="${#lists.isEmpty(matches)}">No co-riders yet. This is the best deal you can get.</h2>
+            <h2 th:unless="${#lists.isEmpty(matches)}"
+                th:text="'Best deal when you share with ' + ${groupSize - 1} + (${groupSize - 1} == 1 ? ' rider' : ' riders')">Best deal</h2>
+            <div class="provider"><span th:text="${best.provider}">Ola</span> <span th:text="${best.vehicle}" style="font-weight:500">Mini cab</span></div>
+            <p th:if="${saving > 0 and !#lists.isEmpty(matches)}">
+                You save about &#8377;<strong th:text="${saving}">100</strong> compared with the cheapest solo ride (&#8377;<span th:text="${soloBest}">200</span>).
+            </p>
+            <p th:if="${#lists.isEmpty(matches)}">
+                Riding alone, this is the cheapest option. Check back later, because new riders join all the time.
+            </p>
+        </div>
+        <div class="price">
+            &#8377;<span th:text="${best.perPerson}">150</span>
+            <small th:text="${groupSize > 1 and best.shareable} ? 'your share' : 'for the ride'">for the ride</small>
+        </div>
+    </section>
+
+    <div class="two-col">
+        <!-- Co-riders -->
+        <section>
+            <h2>Riders going your way</h2>
+
+            <div class="empty" th:if="${#lists.isEmpty(matches)}">
+                <h3>Nobody matches yet</h3>
+                <p style="margin-inline:auto">We look for riders whose pickup and drop are within 2 km of yours and who leave within 20 minutes of you.</p>
+                <a class="btn ghost small" th:href="@{/searching/{id}(id=${ride.id})}">Keep searching</a>
+            </div>
+
+            <article class="rider" th:each="m : ${matches}">
+                <div class="rider-head">
+                    <h3 style="margin:0" th:text="${m.user.name}">Name</h3>
+                    <span class="rating" th:if="${m.avgRating != null}">
+                        <span class="star" aria-hidden="true">&#9733;</span>
+                        <span th:text="${#numbers.formatDecimal(m.avgRating, 1, 1)}">4.5</span>
+                        <span class="muted small" th:text="'(' + ${m.ratingCount} + ')'">(3)</span>
+                    </span>
+                    <span class="muted small" th:if="${m.avgRating == null}">No ratings yet</span>
+                </div>
+                <p class="muted small" style="margin:.25rem 0 0"
+                   th:text="'Pickup ' + ${#numbers.formatDecimal(m.pickupKm, 1, 1)} + ' km from yours, leaving ' + ${#temporals.format(m.departureTime, 'hh:mm a')}
+                            + (${m.minutesApart} == 0 ? ' (same time)' : ' (' + ${m.minutesApart} + ' min apart)')">
+                    Details
+                </p>
+                <div class="contact">
+                    Phone: <a th:href="'tel:' + ${m.user.phone}" th:text="${m.user.phone}">+91 00000 00000</a><br>
+                    Email: <a th:href="'mailto:' + ${m.user.email}" th:text="${m.user.email}">a@b.com</a>
+                </div>
+                <p style="margin:.25rem 0 .5rem">
+                    <a class="btn small" th:href="@{/chat/{uid}(uid=${m.user.id})}">Message</a>
+                </p>
+                <form class="rate-form" method="post" th:action="@{/rate}">
+                    <input type="hidden" name="rideId" th:value="${ride.id}">
+                    <input type="hidden" name="ratedUserId" th:value="${m.user.id}">
+                    <label class="small" style="margin:0;font-weight:500"
+                           th:for="'stars-' + ${m.user.id}">Your rating</label>
+                    <select name="stars" th:id="'stars-' + ${m.user.id}">
+                        <option th:each="s : ${#numbers.sequence(5, 1, -1)}"
+                                th:value="${s}" th:text="${s} + ' out of 5'"
+                                th:selected="${m.myStars != null and m.myStars == s}">5 out of 5</option>
+                    </select>
+                    <button class="btn ghost small" type="submit">Save rating</button>
+                </form>
+            </article>
+
+            <p class="small muted" th:unless="${#lists.isEmpty(matches)}">
+                Call or message your co-riders to agree on a pickup spot. Meet in a public place, and check the cab's number plate before you get in.
+            </p>
+        </section>
+
+        <!-- Fare comparison and booking -->
+        <section>
+            <h2>Choose a service</h2>
+            <form class="card" style="padding:.75rem 1.25rem 1.25rem" method="post" th:action="@{/book}" id="book-form">
+                <input type="hidden" name="rideId" th:value="${ride.id}">
+                <table class="fares">
+                    <thead>
+                    <tr>
+                        <th>Service</th>
+                        <th class="num">Total fare</th>
+                        <th class="num" th:text="${groupSize > 1} ? 'Your share' : 'Per person'">Per person</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="q : ${quotes}" th:classappend="${q.best} ? 'is-best'">
+                        <td>
+                            <label class="choice" th:for="'p-' + ${q.provider}">
+                                <input type="radio" name="provider" required
+                                       th:id="'p-' + ${q.provider}"
+                                       th:value="${q.provider}"
+                                       th:checked="${q.best}"
+                                       th:attr="data-label=${q.provider + ' ' + q.vehicle},data-share=${q.perPerson}">
+                                <span class="choice-text">
+                                    <span>
+                                        <strong th:text="${q.provider}">Ola</strong>
+                                        <span class="muted" th:text="${q.vehicle}">Mini cab</span>
+                                        <span class="tag" th:if="${q.best}">Best deal</span>
+                                        <span class="tag surge" th:if="${q.surge}">Peak hour</span>
+                                    </span>
+                                    <span class="muted small" style="display:block" th:text="${q.note}">Note</span>
+                                </span>
+                            </label>
+                        </td>
+                        <td class="num">&#8377;<span th:text="${q.totalFare}">200</span></td>
+                        <td class="num"><strong>&#8377;<span th:text="${q.perPerson}">100</span></strong></td>
+                    </tr>
+                    </tbody>
+                </table>
+                <p class="small muted" style="margin:.75rem 0">
+                    These are estimates worked out from distance and time, not live prices from the apps. Check the app for the exact fare before you pay.
+                </p>
+                <p id="selection-text" class="small" style="font-weight:600;margin-bottom:.5rem" aria-live="polite"></p>
+                <button class="btn block" type="submit">Book now</button>
+            </form>
+            <p style="margin-top:1rem">
+                <a class="btn ghost" th:href="@{/request}">Plan another ride</a>
+            </p>
+        </section>
+    </div>
+</main>
+<script th:src="@{/js/results.js}"></script>
+</body>
+</html>

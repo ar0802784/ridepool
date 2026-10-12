@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments :: head('Looking for riders')}"></head>
+<body>
+<header th:replace="~{fragments :: topbar}"></header>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<main class="page">
+    <div class="split" id="app"
+         th:attr="data-id=${ride.id},data-from-lat=${ride.fromLat},data-from-lng=${ride.fromLng},data-to-lat=${ride.toLat},data-to-lng=${ride.toLng}">
+
+        <section class="card">
+            <div class="status-row" aria-live="polite">
+                <div class="spinner" id="spinner" aria-hidden="true"></div>
+                <h1 id="status-title" style="margin:0;font-size:1.5rem">Looking for riders</h1>
+            </div>
+            <p class="muted" id="status-text">Checking for people going your way. This page updates by itself.</p>
+
+            <p style="margin-bottom:.25rem"><strong th:text="${ride.fromName}">From</strong></p>
+            <p class="muted small" style="margin-bottom:.5rem">to</p>
+            <p><strong th:text="${ride.toName}">To</strong></p>
+            <p class="muted small" th:text="'Leaving ' + ${#temporals.format(ride.departureTime, 'dd MMM, hh:mm a')}">Leaving soon</p>
+
+            <div class="stats">
+                <div class="stat"><b th:text="${#numbers.formatDecimal(km, 1, 1)} + ' km'">12 km</b><span>Estimated distance</span></div>
+                <div class="stat"><b th:text="${minutes} + ' min'">30 min</b><span>Estimated time</span></div>
+                <div class="stat">
+                    <b>&#8377;<span th:text="${minCost}">150</span> to &#8377;<span th:text="${maxCost}">300</span></b>
+                    <span>Estimated cost if you ride alone</span>
+                </div>
+            </div>
+            <p class="small muted" th:if="${peak}">Leaving at a busy hour, so these fares include a typical peak-time increase.</p>
+
+            <div class="actions">
+                <a class="btn" th:href="@{/results/{id}(id=${ride.id})}">Skip waiting and see the best deals</a>
+                <button class="btn ghost" type="button" id="demo-btn">Add demo riders nearby</button>
+                <form method="post" th:action="@{/cancel/{id}(id=${ride.id})}">
+                    <button class="link-btn" type="submit">Cancel this ride</button>
+                </form>
+            </div>
+        </section>
+
+        <div>
+            <div id="map" class="map tall" aria-label="Map showing your route and nearby riders"></div>
+            <p class="field-hint">Yellow dots are riders heading your way. Their phone numbers appear once you are matched.</p>
+        </div>
+    </div>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script th:src="@{/js/searching.js}"></script>
+</body>
+</html>
