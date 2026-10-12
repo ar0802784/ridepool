@@ -1,6 +1,6 @@
 # 🚗 RidePool - Smarter Ride-Sharing & Fare Comparison
 
-[![GitHub Pages](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-0d6b57?style=for-the-badge&logo=github)](https://YOUR_GITHUB_USERNAME.github.io/ridepool/)
+[![GitHub Pages](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-0d6b57?style=for-the-badge&logo=github)](https://ar0802784.github.io/ridepool/)
 [![Java](https://img.shields.io/badge/Java-17%2B-orange?style=for-the-badge&logo=openjdk)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-brightgreen?style=for-the-badge&logo=springboot)](https://spring.io/projects/spring-boot)
 [![Leaflet](https://img.shields.io/badge/Maps-Leaflet%20%2B%20OSM-199900?style=for-the-badge&logo=leaflet)](https://leafletjs.com/)
@@ -13,7 +13,7 @@ Find people travelling the same route, split the fare automatically, and instant
 
 Experience RidePool live directly in your browser without installing anything:
 
-👉 **[Launch RidePool Live Demo](https://YOUR_GITHUB_USERNAME.github.io/ridepool/)** *(Replace with your actual GitHub username once deployed)*
+👉 **[Launch RidePool Live Demo](https://ar0802784.github.io/ridepool/)**
 
 ### Key Features in Live Demo:
 - 🗺️ **Interactive OpenStreetMap + Leaflet Map**: Tap to set pickup and drop locations, or search anywhere with address autocomplete.
@@ -26,7 +26,7 @@ Experience RidePool live directly in your browser without installing anything:
 
 ## 🚀 How to Publish to Your GitHub & Activate Your Live Link
 
-Follow these simple steps to post this project on your GitHub account and get a live link like `https://<your-username>.github.io/<your-repo>/`:
+Follow these simple steps to post this project on your GitHub account and get a live link:
 
 ### Step 1: Initialize Git and Commit
 Open PowerShell or Terminal in this folder (`ridepool`):
@@ -39,7 +39,7 @@ git commit -m "Initial commit: RidePool full-stack application and GitHub Pages 
 
 ### Step 2: Create a New Repository on GitHub
 1. Go to [GitHub.com/new](https://github.com/new).
-2. Set **Repository name** to `ridepool` (or whatever you prefer).
+2. Set **Repository name** to `ridepool`.
 3. Set visibility to **Public**.
 4. Leave **Initialize with README** **UNCHECKED** (we already have a complete one).
 5. Click **Create repository**.
@@ -49,10 +49,9 @@ Copy and run the commands shown on GitHub:
 
 ```bash
 git branch -M main
-git remote add origin https://github.com/YOUR_GITHUB_USERNAME/ridepool.git
+git remote add origin https://github.com/ar0802784/ridepool.git
 git push -u origin main
 ```
-*(Replace `YOUR_GITHUB_USERNAME` with your actual GitHub username)*
 
 ### Step 4: Turn ON GitHub Pages (Get Your Live Link!)
 1. Go to your repository on GitHub.
@@ -64,7 +63,7 @@ git push -u origin main
    - Click **Save**.
 5. Wait ~30-60 seconds and refresh the page.
 6. GitHub will display your live link at the top:
-   > **Your site is live at `https://YOUR_GITHUB_USERNAME.github.io/ridepool/`** 🎉
+   > **Your site is live at `https://ar0802784.github.io/ridepool/`** 🎉
 
 ---
 
