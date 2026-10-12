@@ -1,11 +1,10 @@
 /**
- * RidePool - Client-side Interactive Engine for GitHub Pages & Live Demo
- * Replicates full backend matching, fare calculation, auth flow, chat simulation, and trip storage.
+ * RidePool - Client-side Interactive Engine
+ * Faithful reproduction of Java Spring Boot backend matching, fare calculation, auth, chat & booking.
  */
 (function () {
   "use strict";
 
-  // --- Configuration & Constants ---
   const NOMINATIM = "https://nominatim.openstreetmap.org";
   const DEFAULT_CENTER = [28.6139, 77.2090]; // Delhi NCR
   const DEMO_NAMES = ["Aarav", "Diya", "Kabir", "Meera", "Rohan", "Ishita"];
@@ -13,30 +12,20 @@
   const DEMO_REPLIES = [
     "Hi! Yes, I'm going the same way. Happy to share.",
     "Sounds good. I'll be at the pickup point 5 minutes early.",
-    "Great, see you there! Message me if anything changes.",
-    "Works for me. Splitting the fare will save us both money!"
+    "Great, see you there. Message me if anything changes.",
+    "Works for me. Should we split the fare equally?"
   ];
 
   const RATES = [
-    { provider: "Rapido", vehicle: "Bike taxi", base: 20, perKm: 7.5, perMin: 0.4, minFare: 35, peakSurge: 1.10, shareable: false, url: "https://www.rapido.bike", note: "Carries 1 rider; cannot be split." },
-    { provider: "Ola", vehicle: "Mini cab", base: 50, perKm: 12.0, perMin: 1.2, minFare: 90, peakSurge: 1.25, shareable: true, url: "https://www.olacabs.com", note: "Seats up to 4; fare is split equally." },
-    { provider: "Uber", vehicle: "Go cab", base: 45, perKm: 12.5, perMin: 1.3, minFare: 90, peakSurge: 1.30, shareable: true, url: "https://m.uber.com", note: "Seats up to 4; fare is split equally." },
-    { provider: "inDrive", vehicle: "Cab", base: 40, perKm: 10.5, perMin: 1.0, minFare: 80, peakSurge: 1.00, shareable: true, url: "https://indrive.com", note: "Bid-based starting offer; fare is split." }
+    { provider: "Rapido", vehicle: "Bike taxi", base: 20, perKm: 7.5, perMin: 0.4, minFare: 35, peakSurge: 1.10, shareable: false, note: "Carries one rider, so the fare can't be split." },
+    { provider: "Ola", vehicle: "Mini cab", base: 50, perKm: 12.0, perMin: 1.2, minFare: 90, peakSurge: 1.25, shareable: true, note: "Seats up to 4, so the fare can be split." },
+    { provider: "Uber", vehicle: "Go cab", base: 45, perKm: 12.5, perMin: 1.3, minFare: 90, peakSurge: 1.30, shareable: true, note: "Seats up to 4, so the fare can be split." },
+    { provider: "inDrive", vehicle: "Cab", base: 40, perKm: 10.5, perMin: 1.0, minFare: 80, peakSurge: 1.00, shareable: true, note: "Bid-based: this is a typical starting offer. Drivers may counter." }
   ];
 
-  // Popular preset locations in Delhi NCR for quick 1-click testing
-  const PRESETS = [
-    { name: "Knowledge Park II, Greater Noida", lat: 28.4601, lng: 77.4842 },
-    { name: "India Gate, New Delhi", lat: 28.6129, lng: 77.2295 },
-    { name: "Connaught Place, New Delhi", lat: 28.6304, lng: 77.2177 },
-    { name: "Cyber Hub, Gurugram", lat: 28.4952, lng: 77.0892 },
-    { name: "IGI Airport T3, New Delhi", lat: 28.5562, lng: 77.1000 },
-    { name: "Noida Sector 62", lat: 28.6280, lng: 77.3649 }
-  ];
-
-  // --- App State ---
+  // State
   const state = {
-    user: null, // Null initially -> shows login / register page
+    user: null, // Null initially -> shows login screen
     currentRide: null,
     matches: [],
     quotes: [],
@@ -45,7 +34,6 @@
     activeChatUser: null,
     chatDraft: "",
     unreadMessages: 0,
-    searchInterval: null,
     searchMap: null,
     requestMap: null,
     trips: [],
@@ -53,16 +41,12 @@
     ratings: {}
   };
 
-  // Helper DOM selector
   const $ = (id) => document.getElementById(id);
 
-  // --- LocalStorage persistence for Trips, Chats & Auth ---
   function loadPersistedData() {
     try {
       const savedUser = localStorage.getItem("ridepool_user");
-      if (savedUser) {
-        state.user = JSON.parse(savedUser);
-      }
+      if (savedUser) state.user = JSON.parse(savedUser);
 
       const savedTrips = localStorage.getItem("ridepool_trips");
       if (savedTrips) state.trips = JSON.parse(savedTrips);
@@ -76,11 +60,8 @@
 
   function saveUser() {
     try {
-      if (state.user) {
-        localStorage.setItem("ridepool_user", JSON.stringify(state.user));
-      } else {
-        localStorage.removeItem("ridepool_user");
-      }
+      if (state.user) localStorage.setItem("ridepool_user", JSON.stringify(state.user));
+      else localStorage.removeItem("ridepool_user");
     } catch (e) {}
   }
 
@@ -96,21 +77,45 @@
     } catch (e) {}
   }
 
-  // --- Toast Notifications ---
-  function showToast(msg) {
-    let t = $("toast");
-    if (!t) {
-      t = document.createElement("div");
-      t.id = "toast";
-      t.className = "toast";
-      document.body.appendChild(t);
+  // Deep Link Builder exactly from BookingController.java
+  function buildAppLink(provider, ride) {
+    function enc(v) { return encodeURIComponent(String(v || '')); }
+    function shorten(place) {
+      if (!place) return '';
+      const comma = place.indexOf(',');
+      return comma > 0 ? place.substring(0, comma).trim() : place.trim();
     }
-    t.textContent = msg;
-    t.classList.add("show");
-    setTimeout(() => t.classList.remove("show"), 2800);
+    const fromShort = shorten(ride.fromName);
+    const toShort = shorten(ride.toName);
+
+    if (provider === "Uber") {
+      return "https://m.uber.com/ul/?action=setPickup"
+        + "&pickup%5Blatitude%5D=" + enc(ride.fromLat)
+        + "&pickup%5Blongitude%5D=" + enc(ride.fromLng)
+        + "&pickup%5Bnickname%5D=" + enc(fromShort)
+        + "&pickup%5Bformatted_address%5D=" + enc(ride.fromName)
+        + "&dropoff%5Blatitude%5D=" + enc(ride.toLat)
+        + "&dropoff%5Blongitude%5D=" + enc(ride.toLng)
+        + "&dropoff%5Bnickname%5D=" + enc(toShort)
+        + "&dropoff%5Bformatted_address%5D=" + enc(ride.toName);
+    } else if (provider === "Ola") {
+      return "https://olawebcdn.com/assets/ola-universal-link.html"
+        + "?lat=" + enc(ride.fromLat)
+        + "&lng=" + enc(ride.fromLng)
+        + "&pickup_name=" + enc(fromShort)
+        + "&drop_lat=" + enc(ride.toLat)
+        + "&drop_lng=" + enc(ride.toLng)
+        + "&drop_name=" + enc(toShort)
+        + "&category=mini&landing_page=bk&utm_source=ridepool";
+    } else if (provider === "Rapido") {
+      return "https://www.rapido.bike";
+    } else if (provider === "inDrive") {
+      return "https://indrive.com";
+    }
+    return "https://www.google.com";
   }
 
-  // --- Geo & Math Helpers ---
+  // Geo & Rates
   function haversineKm(lat1, lon1, lat2, lon2) {
     const R = 6371.0;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -154,7 +159,6 @@
         shareable: r.shareable,
         isSurge: peak && r.peakSurge > 1.0,
         note: r.note,
-        url: r.url,
         best: false
       };
     });
@@ -182,7 +186,7 @@
     });
   }
 
-  // --- Auth View Handler ---
+  // Auth View Handler
   function showAuthSubview(subviewId) {
     $("auth-container").hidden = false;
     $("app-container").hidden = true;
@@ -222,30 +226,24 @@
     $("auth-container").hidden = true;
     $("app-container").hidden = false;
     $("user-name-display").textContent = user.name;
-    showToast(`Welcome back, ${user.name}!`);
     navigateTo("request");
   }
 
   function logoutUser() {
     state.user = null;
     saveUser();
-    showToast("You have been logged out.");
     navigateTo("login");
   }
 
-  // --- Router & View Management ---
+  // Router & View Management
   function showView(viewId) {
     document.querySelectorAll(".view-panel").forEach((el) => (el.hidden = true));
-    document.querySelectorAll(".nav-link").forEach((el) => el.classList.remove("active"));
 
     const target = $("view-" + viewId);
     if (target) {
       target.hidden = false;
       window.scrollTo(0, 0);
     }
-
-    const navLink = $("nav-" + viewId);
-    if (navLink) navLink.classList.add("active");
 
     if (viewId === "request") {
       setTimeout(() => {
@@ -266,10 +264,8 @@
     const rawHash = window.location.hash.replace("#", "") || (state.user ? "request" : "login");
     const [view, param] = rawHash.split("/");
 
-    // Handle Auth Pages
     if (view === "login" || view === "register" || view === "forgot-password" || view === "verify-otp" || view === "reset-password") {
       if (state.user && (view === "login" || view === "register")) {
-        // If already logged in, redirect to request
         return navigateTo("request");
       }
       return showAuthSubview(view);
@@ -279,12 +275,10 @@
       return logoutUser();
     }
 
-    // Require Login for all App views
     if (!state.user) {
       return navigateTo("login");
     }
 
-    // Ensure Auth container is hidden and App container is visible
     $("auth-container").hidden = true;
     $("app-container").hidden = false;
     $("user-name-display").textContent = state.user.name;
@@ -316,11 +310,10 @@
     }
   }
 
-  // --- MAP ICONS ---
   function createPinIcon(cls) {
     return L.divIcon({
       className: "",
-      html: `<div class="pin ${cls}"></div>`,
+      html: '<div class="pin ' + cls + '"></div>',
       iconSize: [18, 18],
       iconAnchor: [9, 9]
     });
@@ -329,13 +322,13 @@
   function createPulseIcon() {
     return L.divIcon({
       className: "",
-      html: `<div class="pulse-marker"><div class="ring"></div><div class="dot"></div></div>`,
+      html: '<div class="pulse-marker"><div class="ring"></div><div class="dot"></div></div>',
       iconSize: [18, 18],
       iconAnchor: [9, 9]
     });
   }
 
-  // --- VIEW 1: REQUEST PAGE ---
+  // VIEW 1: REQUEST PAGE
   let reqPickupMarker = null;
   let reqDropMarker = null;
   let reqRouteLine = null;
@@ -350,49 +343,45 @@
       departureInput.value = now.toISOString().slice(0, 16);
     }
 
-    // Default form values
-    $("from").value = PRESETS[0].name;
-    $("fromLat").value = PRESETS[0].lat;
-    $("fromLng").value = PRESETS[0].lng;
+    // EMPTY by default - NO prefilled destination
+    $("from").value = "";
+    $("fromLat").value = "";
+    $("fromLng").value = "";
 
-    $("to").value = PRESETS[1].name;
-    $("toLat").value = PRESETS[1].lat;
-    $("toLng").value = PRESETS[1].lng;
+    $("to").value = "";
+    $("toLat").value = "";
+    $("toLng").value = "";
 
-    // Initialize Request Map
     state.requestMap = L.map("map").setView(DEFAULT_CENTER, 10);
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: "&copy; OpenStreetMap contributors"
     }).addTo(state.requestMap);
 
-    updateRequestMapPoints();
-
-    // Map Click handler to set pickup/drop
+    // Tap map
     state.requestMap.on("click", function (e) {
-      const key = !$("fromLat").value ? "from" : !$("toLat").value ? "to" : activeField;
+      const key = !$("fromLat").value ? "from" : (!$("toLat").value ? "to" : activeField);
       const lat = e.latlng.lat;
       const lng = e.latlng.lng;
 
       setPlace(key, lat, lng, "Looking up address...", false);
 
-      fetch(`${NOMINATIM}/reverse?format=jsonv2&lat=${lat}&lon=${lng}`)
+      fetch(NOMINATIM + "/reverse?format=jsonv2&lat=" + lat + "&lon=" + lng)
         .then((r) => r.json())
         .then((d) => {
-          const addr = d.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+          const addr = d.display_name || (lat.toFixed(5) + ", " + lng.toFixed(5));
           setPlace(key, lat, lng, addr, false);
         })
         .catch(() => {
-          setPlace(key, lat, lng, `${lat.toFixed(4)}, ${lng.toFixed(4)}`, false);
+          setPlace(key, lat, lng, lat.toFixed(5) + ", " + lng.toFixed(5), false);
         });
 
       $("map-hint").textContent =
         $("fromLat").value && $("toLat").value
-          ? `Tap map again to move ${key === "from" ? "pickup" : "drop"} point.`
-          : "Now tap the map to set your drop location.";
+          ? "Tap the map again to move the " + (key === "from" ? "pickup" : "drop") + " point."
+          : "Now tap the map to set the drop.";
     });
 
-    // Form inputs and debounce autocomplete
     ["from", "to"].forEach((key) => {
       const input = $(key);
       const list = $(key + "-list");
@@ -409,22 +398,9 @@
       });
     });
 
-    // Preset pills click
-    document.querySelectorAll(".preset-pill").forEach((pill) => {
-      pill.addEventListener("click", () => {
-        const target = pill.dataset.target;
-        const idx = parseInt(pill.dataset.index, 10);
-        const preset = PRESETS[idx];
-        if (preset) {
-          setPlace(target, preset.lat, preset.lng, preset.name, true);
-        }
-      });
-    });
-
-    // Use current location button
     $("use-location").addEventListener("click", () => {
       if (!navigator.geolocation) {
-        showToast("Geolocation is not supported by your browser");
+        alert("Geolocation is not supported by your browser");
         return;
       }
       $("use-location").textContent = "Locating you...";
@@ -433,11 +409,10 @@
           $("use-location").textContent = "Use my current location";
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
-          fetch(`${NOMINATIM}/reverse?format=jsonv2&lat=${lat}&lon=${lng}`)
+          fetch(NOMINATIM + "/reverse?format=jsonv2&lat=" + lat + "&lon=" + lng)
             .then((r) => r.json())
             .then((d) => {
               setPlace("from", lat, lng, d.display_name || "My Current Location", true);
-              showToast("Pickup set to your current location");
             })
             .catch(() => {
               setPlace("from", lat, lng, "My Location", true);
@@ -445,12 +420,11 @@
         },
         () => {
           $("use-location").textContent = "Use my current location";
-          showToast("Could not access location. Please tap the map.");
+          alert("Could not access location. Please tap the map.");
         }
       );
     });
 
-    // Submit ride request
     $("ride-form").addEventListener("submit", (e) => {
       e.preventDefault();
       const fromName = $("from").value.trim();
@@ -462,7 +436,7 @@
       const departureVal = $("departure").value;
 
       if (!fromName || isNaN(fromLat) || !toName || isNaN(toLat) || !departureVal) {
-        $("form-error-js").textContent = "Please select valid pickup and drop points.";
+        $("form-error-js").textContent = "Please pick a pickup and a drop point on the map or from suggestions.";
         $("form-error-js").hidden = false;
         return;
       }
@@ -492,7 +466,7 @@
         createdAt: new Date()
       };
 
-      state.matches = []; // Reset co-riders
+      state.matches = [];
       navigateTo("searching");
     });
   }
@@ -517,35 +491,31 @@
 
     const pts = [];
     if (!isNaN(fromLat) && !isNaN(fromLng)) {
-      reqPickupMarker = L.marker([fromLat, fromLng], { icon: createPinIcon("rider") })
-        .addTo(state.requestMap)
-        .bindTooltip("Pickup");
+      reqPickupMarker = L.marker([fromLat, fromLng], { icon: createPinIcon("rider") }).addTo(state.requestMap);
       pts.push([fromLat, fromLng]);
     }
     if (!isNaN(toLat) && !isNaN(toLng)) {
-      reqDropMarker = L.marker([toLat, toLng], { icon: createPinIcon("drop") })
-        .addTo(state.requestMap)
-        .bindTooltip("Drop");
+      reqDropMarker = L.marker([toLat, toLng], { icon: createPinIcon("drop") }).addTo(state.requestMap);
       pts.push([toLat, toLng]);
     }
 
     if (pts.length === 2) {
-      reqRouteLine = L.polyline(pts, { color: "#0d6b57", weight: 3, dashArray: "6 8" }).addTo(state.requestMap);
+      reqRouteLine = L.polyline(pts, { color: "#0e4f3f", weight: 3, dashArray: "6 8" }).addTo(state.requestMap);
       if (fit) state.requestMap.fitBounds(L.latLngBounds(pts), { padding: [50, 50] });
 
-      fetch(`https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`)
+      fetch("https://router.project-osrm.org/route/v1/driving/" + fromLng + "," + fromLat + ";" + toLng + "," + toLat + "?overview=full&geometries=geojson")
         .then((r) => r.json())
         .then((d) => {
           if (d.routes && d.routes.length) {
             const coords = d.routes[0].geometry.coordinates.map((c) => [c[1], c[0]]);
             if (reqRouteLine) state.requestMap.removeLayer(reqRouteLine);
-            reqRouteLine = L.polyline(coords, { color: "#0d6b57", weight: 4 }).addTo(state.requestMap);
+            reqRouteLine = L.polyline(coords, { color: "#0e4f3f", weight: 4 }).addTo(state.requestMap);
             if (fit) state.requestMap.fitBounds(reqRouteLine.getBounds(), { padding: [50, 50] });
           }
         })
         .catch(() => {});
     } else if (pts.length === 1 && fit) {
-      state.requestMap.setView(pts[0], 13);
+      state.requestMap.setView(pts[0], 14);
     }
   }
 
@@ -557,7 +527,7 @@
       return;
     }
 
-    fetch(`${NOMINATIM}/search?format=jsonv2&limit=5&countrycodes=in&q=${encodeURIComponent(q)}`)
+    fetch(NOMINATIM + "/search?format=jsonv2&limit=5&countrycodes=in&q=" + encodeURIComponent(q))
       .then((r) => r.json())
       .then((data) => {
         list.innerHTML = "";
@@ -579,23 +549,23 @@
       .catch(() => (list.hidden = true));
   }
 
-  // --- VIEW 2: SEARCHING SCREEN ---
+  // VIEW 2: SEARCHING SCREEN
   let searchRiderLayer = null;
 
   function renderSearchingView() {
     const ride = state.currentRide;
     $("search-from").textContent = ride.fromName;
     $("search-to").textContent = ride.toName;
-    $("search-time").textContent = `Leaving ${formatDate(ride.departureTime)}`;
-    $("search-km").textContent = `${ride.km.toFixed(1)} km`;
-    $("search-min").textContent = `${ride.minutes} min`;
-    $("search-cost").textContent = `₹${ride.minCost} to ₹${ride.maxCost}`;
+    $("search-time").textContent = "Leaving " + formatDate(ride.departureTime);
+    $("search-km").textContent = ride.km.toFixed(1) + " km";
+    $("search-min").textContent = ride.minutes + " min";
+    $("search-cost").innerHTML = "&#8377;" + ride.minCost + " to &#8377;" + ride.maxCost;
 
     $("search-peak-hint").hidden = !ride.peak;
 
     const demoBtn = $("demo-btn");
     demoBtn.disabled = false;
-    demoBtn.textContent = "⚡ Add demo riders nearby";
+    demoBtn.textContent = "Add demo riders nearby";
 
     if (state.searchMap) {
       state.searchMap.remove();
@@ -612,16 +582,16 @@
     L.marker(fromPt, { icon: createPulseIcon() }).addTo(state.searchMap).bindTooltip("You are here");
     L.marker(toPt, { icon: createPinIcon("drop") }).addTo(state.searchMap).bindTooltip("Drop");
 
-    const straight = L.polyline([fromPt, toPt], { color: "#0d6b57", weight: 3, dashArray: "6 8" }).addTo(state.searchMap);
+    const straight = L.polyline([fromPt, toPt], { color: "#0e4f3f", weight: 3, dashArray: "6 8" }).addTo(state.searchMap);
     state.searchMap.fitBounds(L.latLngBounds([fromPt, toPt]), { padding: [50, 50] });
 
-    fetch(`https://router.project-osrm.org/route/v1/driving/${ride.fromLng},${ride.fromLat};${ride.toLng},${ride.toLat}?overview=full&geometries=geojson`)
+    fetch("https://router.project-osrm.org/route/v1/driving/" + ride.fromLng + "," + ride.fromLat + ";" + ride.toLng + "," + ride.toLat + "?overview=full&geometries=geojson")
       .then((r) => r.json())
       .then((d) => {
         if (d.routes && d.routes.length) {
           const coords = d.routes[0].geometry.coordinates.map((c) => [c[1], c[0]]);
           state.searchMap.removeLayer(straight);
-          const line = L.polyline(coords, { color: "#0d6b57", weight: 4 }).addTo(state.searchMap);
+          const line = L.polyline(coords, { color: "#0e4f3f", weight: 4 }).addTo(state.searchMap);
           state.searchMap.fitBounds(line.getBounds(), { padding: [50, 50] });
         }
       })
@@ -640,7 +610,7 @@
     const newMatches = [];
 
     for (let i = 0; i < count; i++) {
-      const jitterLat = (Math.random() - 0.5) * 0.012; // ~600m
+      const jitterLat = (Math.random() - 0.5) * 0.012;
       const jitterLng = (Math.random() - 0.5) * 0.012;
       const pickupKm = Math.max((Math.hypot(jitterLat, jitterLng) * 111).toFixed(1), 0.3);
       const minutesApart = Math.floor(Math.random() * 8) - 4;
@@ -648,9 +618,9 @@
 
       const rider = {
         id: 100 + i + 1,
-        name: `${DEMO_NAMES[i]} (demo)`,
-        email: `demo-${DEMO_NAMES[i].toLowerCase()}@ridepool.demo`,
-        phone: `+91 9810${i + 1} 4567${i}`,
+        name: DEMO_NAMES[i] + " (demo)",
+        email: "demo-" + DEMO_NAMES[i].toLowerCase() + "@ridepool.demo",
+        phone: "+91 00000 0000" + (i + 1),
         rating: DEMO_STARS[i],
         ratingCount: 3 + i,
         pickupKm: pickupKm,
@@ -666,10 +636,8 @@
     state.matches = newMatches;
     renderSearchRidersOnMap();
 
-    $("status-title").textContent = `${newMatches.length} riders found!`;
-    $("status-text").textContent = "Taking you to their details and fare comparison...";
-
-    showToast("3 matching co-riders found nearby!");
+    $("status-title").textContent = newMatches.length + " riders found";
+    $("status-text").textContent = "Taking you to their details and the fare comparison.";
 
     setTimeout(() => {
       navigateTo("results");
@@ -680,55 +648,56 @@
     if (!searchRiderLayer || !state.searchMap) return;
     searchRiderLayer.clearLayers();
     state.matches.forEach((r) => {
-      const popup = document.createElement("div");
-      popup.innerHTML = `<strong>${r.name}</strong><br>${r.pickupKm} km from you • ★ ${r.rating}`;
+      const el = document.createElement("div");
+      el.innerHTML = "<strong>" + r.name + "</strong><br>" + r.pickupKm + " km from your pickup, rated " + r.rating + " out of 5";
       L.marker([r.lat, r.lng], { icon: createPinIcon("rider") })
         .addTo(searchRiderLayer)
-        .bindPopup(popup);
+        .bindPopup(el);
     });
   }
 
-  // --- VIEW 3: RESULTS & FARES ---
+  // VIEW 3: RESULTS & FARES
   function renderResultsView() {
     const ride = state.currentRide;
-    const groupSize = 1 + state.matches.length; // You + matches
+    const groupSize = 1 + state.matches.length;
     const quotes = calcQuotes(ride.km, ride.minutes, ride.departureTime, groupSize);
     state.quotes = quotes;
-    state.selectedQuote = quotes[0]; // best deal pre-selected
+    state.selectedQuote = quotes[0];
 
     $("res-from").textContent = ride.fromName;
     $("res-to").textContent = ride.toName;
-    $("res-summary").textContent = `${formatDate(ride.departureTime)}, about ${ride.km.toFixed(1)} km, around ${ride.minutes} min`;
+    $("res-summary").textContent = formatDate(ride.departureTime) + ", about " + ride.km.toFixed(1) + " km, around " + ride.minutes + " min";
 
-    // Best Deal Card
     const best = quotes[0];
     const soloQuotes = calcQuotes(ride.km, ride.minutes, ride.departureTime, 1);
     const soloBest = soloQuotes[0].perPerson;
     const saving = soloBest - best.perPerson;
 
     if (state.matches.length > 0) {
-      $("best-headline").textContent = `Best deal when you share with ${state.matches.length} rider${state.matches.length > 1 ? "s" : ""}`;
-      $("best-sub").textContent = saving > 0 
-        ? `You save about ₹${saving} compared with riding alone (₹${soloBest}).`
-        : `Cheapest route split across your group.`;
+      $("best-headline").textContent = "Best deal when you share with " + state.matches.length + (state.matches.length === 1 ? " rider" : " riders");
+      $("best-saving").innerHTML = "You save about &#8377;<strong>" + saving + "</strong> compared with the cheapest solo ride (&#8377;" + soloBest + ").";
       $("best-share-label").textContent = best.shareable ? "your share" : "for the ride";
     } else {
-      $("best-headline").textContent = `No co-riders yet. This is the best solo deal.`;
-      $("best-sub").textContent = `Riding alone, this is the cheapest option. You can keep searching anytime.`;
+      $("best-headline").textContent = "No co-riders yet. This is the best deal you can get.";
+      $("best-saving").textContent = "Riding alone, this is the cheapest option. Check back later, because new riders join all the time.";
       $("best-share-label").textContent = "for the ride";
     }
 
-    $("best-provider").textContent = `${best.provider} ${best.vehicle}`;
+    $("best-provider").textContent = best.provider;
+    $("best-vehicle").textContent = best.vehicle;
     $("best-price").textContent = best.perPerson;
 
-    // Riders Section
+    // Co-riders list
     const ridersContainer = $("riders-list");
     ridersContainer.innerHTML = "";
 
     if (state.matches.length === 0) {
       $("riders-empty").hidden = false;
+      $("riders-tip").hidden = true;
     } else {
       $("riders-empty").hidden = true;
+      $("riders-tip").hidden = false;
+
       state.matches.forEach((m) => {
         const card = document.createElement("article");
         card.className = "rider";
@@ -736,7 +705,7 @@
           <div class="rider-head">
             <h3 style="margin:0">${m.name}</h3>
             <span class="rating">
-              <span class="star">★</span> ${m.rating.toFixed(1)}
+              <span class="star">&#9733;</span> ${m.rating.toFixed(1)}
               <span class="muted small">(${m.ratingCount})</span>
             </span>
           </div>
@@ -748,31 +717,31 @@
             Phone: <a href="tel:${m.phone}">${m.phone}</a><br>
             Email: <a href="mailto:${m.email}">${m.email}</a>
           </div>
-          <div style="margin:.35rem 0 .5rem">
+          <p style="margin:.25rem 0 .5rem">
             <button type="button" class="btn small msg-btn" data-id="${m.id}">Message</button>
-          </div>
+          </p>
           <div class="rate-form">
-            <label class="small">Your rating:</label>
+            <label class="small" style="margin:0;font-weight:500">Your rating</label>
             <select class="rate-select" data-id="${m.id}">
-              <option value="5" ${m.myStars === 5 ? "selected" : ""}>5 - Excellent</option>
-              <option value="4" ${m.myStars === 4 ? "selected" : ""}>4 - Good</option>
-              <option value="3" ${m.myStars === 3 ? "selected" : ""}>3 - Average</option>
-              <option value="2" ${m.myStars === 2 ? "selected" : ""}>2 - Poor</option>
-              <option value="1" ${m.myStars === 1 ? "selected" : ""}>1 - Terrible</option>
+              <option value="5" ${m.myStars === 5 ? "selected" : ""}>5 out of 5</option>
+              <option value="4" ${m.myStars === 4 ? "selected" : ""}>4 out of 5</option>
+              <option value="3" ${m.myStars === 3 ? "selected" : ""}>3 out of 5</option>
+              <option value="2" ${m.myStars === 2 ? "selected" : ""}>2 out of 5</option>
+              <option value="1" ${m.myStars === 1 ? "selected" : ""}>1 out of 5</option>
             </select>
-            <button type="button" class="btn ghost small save-rate-btn" data-id="${m.id}">Save</button>
+            <button type="button" class="btn ghost small save-rate-btn" data-id="${m.id}">Save rating</button>
           </div>
         `;
 
         card.querySelector(".msg-btn").addEventListener("click", () => {
-          navigateTo(`chat/${m.id}`);
+          navigateTo("chat/" + m.id);
         });
 
-        card.querySelector(".save-rate-btn").addEventListener("click", (e) => {
+        card.querySelector(".save-rate-btn").addEventListener("click", () => {
           const stars = parseInt(card.querySelector(".rate-select").value, 10);
           state.ratings[m.id] = stars;
           m.myStars = stars;
-          showToast(`Saved ${stars}-star rating for ${m.name}`);
+          alert("Saved rating: " + stars + " stars");
         });
 
         ridersContainer.appendChild(card);
@@ -780,34 +749,36 @@
     }
 
     // Fares Table
+    $("col-header-share").textContent = groupSize > 1 ? "Your share" : "Per person";
     const faresTbody = $("fares-tbody");
     faresTbody.innerHTML = "";
 
     quotes.forEach((q, idx) => {
       const tr = document.createElement("tr");
-      if (q.best) tr.classList.add("selected");
 
-      const surgeTag = q.isSurge ? `<span class="tag surge">Peak surge</span>` : "";
-      const bestTag = q.best ? `<span class="tag best-deal">Best deal</span>` : "";
+      const surgeTag = q.isSurge ? '<span class="tag surge">Peak surge</span>' : "";
+      const bestTag = q.best ? '<span class="tag">Best deal</span>' : "";
 
       tr.innerHTML = `
         <td>
-          <label class="choice">
-            <input type="radio" name="providerOption" value="${idx}" ${q.best ? "checked" : ""}>
+          <label class="choice" for="opt-${idx}">
+            <input type="radio" name="providerOption" id="opt-${idx}" value="${idx}" ${q.best ? "checked" : ""}>
             <div>
-              <strong>${q.provider}</strong> ${q.vehicle}
-              ${bestTag} ${surgeTag}
-              <div class="muted small">${q.note}</div>
+              <span>${q.provider}</span>
+              <span style="font-weight:500">${q.vehicle}</span>
+              ${bestTag}
+              ${surgeTag}
+              <div class="field-hint" style="margin-top:0">${q.note}</div>
             </div>
           </label>
         </td>
-        <td class="num">₹${q.totalFare}</td>
-        <td class="num"><strong>₹${q.perPerson}</strong></td>
+        <td class="num">&#8377;<span>${q.totalFare}</span></td>
+        <td class="num">&#8377;<strong>${q.perPerson}</strong></td>
       `;
 
-      tr.querySelector("input").addEventListener("change", () => {
-        document.querySelectorAll("#fares-tbody tr").forEach((r) => r.classList.remove("selected"));
-        tr.classList.add("selected");
+      // Clicking row or radio updates selection
+      tr.addEventListener("click", () => {
+        tr.querySelector("input").checked = true;
         state.selectedQuote = q;
         updateSelectionText();
       });
@@ -821,32 +792,44 @@
   function updateSelectionText() {
     const q = state.selectedQuote;
     if (q) {
-      $("selection-text").textContent = `Selected: ${q.provider} ${q.vehicle}, your share about ₹${q.perPerson}`;
+      $("selection-text").textContent = "Selected: " + q.provider + " " + q.vehicle + ", your share about Rs " + q.perPerson;
+      $("book-submit").textContent = "Book " + q.provider + " now";
     }
   }
 
-  // --- VIEW 4: BOOKING SUMMARY ---
+  // VIEW 4: BOOKING SUMMARY
   function renderBookingView() {
     const b = state.currentBooking;
     const r = state.currentRide;
 
-    $("book-saved-time").textContent = `Saved ${formatDate(b.createdAt)}`;
-    $("book-provider").textContent = `${b.provider} ${b.vehicle}`;
+    $("book-saved-time").textContent = "Saved " + formatDate(b.createdAt);
+    $("book-provider").textContent = b.provider;
+    $("book-vehicle").textContent = b.vehicle;
     $("book-split-info").textContent =
       b.groupSize > 1
-        ? `Shared by ${b.groupSize} riders. Total fare about ₹${b.totalFare}.`
-        : `Riding alone. Total fare about ₹${b.totalFare}.`;
+        ? "Shared by " + b.groupSize + " riders. Total fare about Rs " + b.totalFare + "."
+        : "Riding alone. Total fare about Rs " + b.totalFare + ".";
     $("book-share-price").textContent = b.perPerson;
     $("book-share-label").textContent = b.groupSize > 1 ? "your share" : "for the ride";
 
-    $("book-open-btn").textContent = `Open ${b.provider}`;
-    $("book-open-btn").href = b.url;
+    $("book-provider-name-1").textContent = b.provider;
+    $("book-provider-name-2").textContent = b.provider;
+
+    const openBtn = $("book-open-btn");
+    openBtn.textContent = "Open " + b.provider;
+    const appUrl = buildAppLink(b.provider, r);
+    openBtn.href = appUrl;
+
+    // Direct click handler so it always redirects reliably!
+    openBtn.onclick = function (e) {
+      e.preventDefault();
+      window.open(appUrl, "_blank", "noopener,noreferrer");
+    };
 
     $("book-pickup-text").textContent = r.fromName;
     $("book-drop-text").textContent = r.toName;
     $("book-leaving-text").textContent = formatDate(r.departureTime);
 
-    // Co-riders summary
     const coridersContainer = $("book-coriders");
     coridersContainer.innerHTML = "";
 
@@ -857,45 +840,49 @@
         item.innerHTML = `
           <div class="rider-head">
             <h3 style="margin:0">${m.name}</h3>
-            <span class="rating"><span class="star">★</span> ${m.rating.toFixed(1)}</span>
+            <span class="rating"><span class="star">&#9733;</span> ${m.rating.toFixed(1)}</span>
           </div>
           <p class="muted small" style="margin:.25rem 0 .5rem">${m.phone}</p>
           <button type="button" class="btn small msg-booking-btn" data-id="${m.id}">Message about this booking</button>
         `;
         item.querySelector(".msg-booking-btn").addEventListener("click", () => {
-          state.chatDraft = `Hey! I've booked our ride with ${b.provider} (${b.vehicle}). Total ₹${b.totalFare}, our share ₹${b.perPerson}. See you soon!`;
-          navigateTo(`chat/${m.id}`);
+          state.chatDraft = "Hi! I've booked our ride with " + b.provider + " (" + b.vehicle + ") from "
+            + r.fromName + " to " + r.toName + " at " + formatTime(r.departureTime)
+            + ". Your share is about Rs " + b.perPerson + ". Shall we meet at the pickup point?";
+          navigateTo("chat/" + m.id);
         });
         coridersContainer.appendChild(item);
       });
     } else {
-      coridersContainer.innerHTML = `<p class="muted">No co-riders on this booking. You can still invite friends or ride solo.</p>`;
+      coridersContainer.innerHTML = '<p class="muted">No co-riders on this booking. You can still <a href="#searching">keep searching</a> before you book.</p>';
     }
   }
 
-  // --- VIEW 5: IN-APP CHAT ---
+  // VIEW 5: IN-APP CHAT
   function renderChatView(riderId) {
     const rider = state.matches.find((m) => m.id === riderId) || {
       id: riderId,
       name: "Co-Rider",
-      phone: "+91 98765 00000"
+      phone: "+91 00000 00000"
     };
 
     state.activeChatUser = rider;
     $("chat-rider-name").textContent = rider.name;
     $("chat-rider-phone").textContent = rider.phone;
-    $("chat-rider-phone").href = `tel:${rider.phone}`;
+    $("chat-rider-phone").href = "tel:" + rider.phone;
 
     const chatLog = $("chat-log");
     chatLog.innerHTML = "";
 
     if (!state.conversations[rider.id]) {
-      state.conversations[rider.id] = [
-        { mine: false, body: `Hey! I saw your ride request for ${state.currentRide ? state.currentRide.toName : "your destination"}. Are you still looking to pool?`, time: "Just now" }
-      ];
+      state.conversations[rider.id] = [];
     }
 
-    state.conversations[rider.id].forEach((m) => addChatBubble(m));
+    if (state.conversations[rider.id].length === 0) {
+      chatLog.innerHTML = '<p class="muted" id="chat-empty">No messages yet. Say hello and agree on a pickup spot.</p>';
+    } else {
+      state.conversations[rider.id].forEach((m) => addChatBubble(m));
+    }
 
     const input = $("chat-body");
     input.value = state.chatDraft || "";
@@ -905,9 +892,12 @@
   }
 
   function addChatBubble(m) {
+    const empty = $("chat-empty");
+    if (empty) empty.remove();
+
     const log = $("chat-log");
     const div = document.createElement("div");
-    div.className = `bubble ${m.mine ? "mine" : "theirs"}`;
+    div.className = "bubble " + (m.mine ? "mine" : "theirs");
     div.innerHTML = `
       <span class="body">${escapeHtml(m.body)}</span>
       <span class="time">${m.time}</span>
@@ -926,7 +916,6 @@
     addChatBubble(msg);
     saveChats();
 
-    // Automated Demo reply after 1.2s delay
     setTimeout(() => {
       const replyText = DEMO_REPLIES[Math.floor(Math.random() * DEMO_REPLIES.length)];
       const replyTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -941,7 +930,6 @@
       } else {
         state.unreadMessages++;
         updateUnreadBadge();
-        showToast(`New message from ${rider.name}`);
       }
     }, 1200);
   }
@@ -956,7 +944,7 @@
     }
   }
 
-  // --- VIEW 6: MESSAGES INBOX ---
+  // VIEW 6: MESSAGES INBOX
   function renderMessagesView() {
     const container = $("inbox-list");
     container.innerHTML = "";
@@ -972,12 +960,13 @@
 
     ids.forEach((id) => {
       const msgs = state.conversations[id];
+      if (!msgs.length) return;
       const last = msgs[msgs.length - 1];
-      const rider = state.matches.find((m) => m.id == id) || { name: `Rider #${id}`, phone: "+91 00000 00000" };
+      const rider = state.matches.find((m) => m.id == id) || { name: "Rider #" + id, phone: "+91 00000 00000" };
 
       const item = document.createElement("a");
       item.className = "convo";
-      item.href = `#chat/${id}`;
+      item.href = "#chat/" + id;
       item.innerHTML = `
         <div class="convo-main">
           <strong>${rider.name}</strong>
@@ -991,7 +980,7 @@
     });
   }
 
-  // --- VIEW 7: MY TRIPS ---
+  // VIEW 7: MY TRIPS
   function renderTripsView() {
     const container = $("trips-list");
     container.innerHTML = "";
@@ -1013,19 +1002,19 @@
             <span class="muted"> to </span>
             <strong>${escapeHtml(t.toName)}</strong>
           </div>
-          <span class="tag ${hasBooking ? "" : "muted-tag"}">${hasBooking ? "Booked: " + t.booking.provider : "Planned"}</span>
+          <span class="tag ${hasBooking ? "" : "muted-tag"}">${hasBooking ? "Booked: " + t.booking.provider : "Not booked"}</span>
         </div>
         <p class="muted small" style="margin:.35rem 0">Leaving ${formatDate(t.departureTime)}</p>
         ${
           hasBooking
             ? `<p class="small" style="margin:.25rem 0">
-                ${t.booking.vehicle}, total about ₹${t.booking.totalFare} 
-                (your share ₹${t.booking.perPerson} for ${t.booking.groupSize} riders)
+                ${t.booking.vehicle}, total about Rs ${t.booking.totalFare} 
+                (your share about Rs ${t.booking.perPerson} for ${t.booking.groupSize} riders)
               </p>`
-            : `<p class="small muted" style="margin:.25rem 0">Estimated ₹${t.minCost} - ₹${t.maxCost}</p>`
+            : `<p class="small muted" style="margin:.25rem 0">Not booked yet</p>`
         }
         <p style="margin:.6rem 0 0">
-          <button type="button" class="btn small load-trip-btn" data-id="${t.id}">View details</button>
+          <button type="button" class="btn small load-trip-btn" data-id="${t.id}">${hasBooking ? "Booking details" : "View fares"}</button>
         </p>
       `;
 
@@ -1043,23 +1032,22 @@
     });
   }
 
-  // --- Utility Escape ---
   function escapeHtml(str) {
     if (!str) return "";
     return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
-  // --- Global Event Listeners Initialization ---
+  // Global Event Listeners
   function initGlobalEvents() {
     window.addEventListener("hashchange", handleHashChange);
 
-    // 1. Auth Event Listeners
+    // Auth Listeners
     $("login-form").addEventListener("submit", (e) => {
       e.preventDefault();
       const email = $("login-email").value.trim();
       const password = $("login-password").value.trim();
       if (!email || !password) {
-        $("login-error").textContent = "Please provide both email and password.";
+        $("login-error").textContent = "Please enter email and password.";
         $("login-error").hidden = false;
         return;
       }
@@ -1067,7 +1055,7 @@
       const userName = email.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
       setAuthenticatedUser({
         id: Date.now(),
-        name: userName || "User",
+        name: userName || "Rider",
         email: email,
         phone: "+91 98765 43210"
       });
@@ -1090,7 +1078,7 @@
       const password = $("reg-password").value.trim();
 
       if (!name || !email || !phone || password.length < 6) {
-        $("register-error").textContent = "Please fill all fields properly (password min 6 chars).";
+        $("register-error").textContent = "Please fill all fields (password minimum 6 characters).";
         $("register-error").hidden = false;
         return;
       }
@@ -1107,7 +1095,6 @@
       e.preventDefault();
       const ident = $("forgot-identifier").value.trim();
       if (!ident) return;
-      showToast("Verification code generated!");
       navigateTo("verify-otp");
     });
 
@@ -1120,7 +1107,6 @@
         return;
       }
       $("otp-error").hidden = true;
-      showToast("Code verified successfully!");
       navigateTo("reset-password");
     });
 
@@ -1142,10 +1128,10 @@
       });
     });
 
-    // 2. Searching Actions
+    // Searching Actions
     $("demo-btn").addEventListener("click", () => {
       $("demo-btn").disabled = true;
-      $("demo-btn").textContent = "Adding nearby riders...";
+      $("demo-btn").textContent = "Adding demo riders...";
       setTimeout(addDemoRiders, 800);
     });
 
@@ -1156,15 +1142,14 @@
     $("cancel-ride-btn").addEventListener("click", () => {
       state.currentRide = null;
       navigateTo("request");
-      showToast("Ride cancelled");
     });
 
-    // 3. Results Actions
+    // Booking Submission: Redirect to Booking summary
     $("book-form").addEventListener("submit", (e) => {
       e.preventDefault();
       const q = state.selectedQuote;
       if (!q) {
-        showToast("Please choose a service first");
+        alert("Please choose a service first.");
         return;
       }
       const booking = {
@@ -1174,7 +1159,6 @@
         totalFare: q.totalFare,
         perPerson: q.perPerson,
         groupSize: 1 + state.matches.length,
-        url: q.url,
         createdAt: new Date()
       };
 
@@ -1187,11 +1171,11 @@
       state.trips.unshift(tripRecord);
       saveTrips();
 
-      showToast(`Selected ${q.provider} ${q.vehicle}!`);
+      // Redirects to booking summary page!
       navigateTo("booking");
     });
 
-    // 4. Chat submit
+    // Chat submit
     $("chat-form").addEventListener("submit", (e) => {
       e.preventDefault();
       const input = $("chat-body");
@@ -1209,23 +1193,21 @@
       }
     });
 
-    // 5. Clipboard copy buttons
+    // Clipboard copy buttons
     document.querySelectorAll("[data-copy]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const text = $(btn.dataset.copy).textContent.trim();
         if (navigator.clipboard) {
           navigator.clipboard.writeText(text).then(() => {
             const original = btn.textContent;
-            btn.textContent = "Copied!";
+            btn.textContent = "Copied";
             setTimeout(() => (btn.textContent = original), 1500);
-            showToast(`Copied to clipboard: "${text}"`);
           });
         }
       });
     });
   }
 
-  // --- Bootloader ---
   document.addEventListener("DOMContentLoaded", () => {
     loadPersistedData();
     initRequestPage();
